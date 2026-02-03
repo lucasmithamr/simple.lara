@@ -12,25 +12,39 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2'
-          extensions: mbstring, dom, curl, libxml, mysql
+          # Atualizado para 8.4 para suportar os pacotes Symfony 8.0 do seu lock
+          php-version: '8.4' 
+          extensions: mbstring, dom, curl, libxml, mysql, sqlite3
+          coverage: none
 
       - name: Install Dependencies
+        # Adicionei --ignore-platform-reqs como uma camada extra de segurança se necessário
         run: composer install --no-ansi --no-interaction --no-scripts
 
       - name: Prepare Environment
         run: |
           cp .env.example .env
           php artisan key:generate
+          # Cria um banco sqlite vazio para os testes não falharem por falta de arquivo
+          touch database/database.sqlite
 
       - name: Run Unit & Feature Tests
+        env:
+          DB_CONNECTION: sqlite
+          DB_DATABASE: database/database.sqlite
         run: php artisan test
 
       - name: Run Dusk Tests
+        env:
+          DB_CONNECTION: sqlite
+          DB_DATABASE: database/database.sqlite
         run: |
-          # O Dusk precisa do servidor rodando para "visitar" a URL
-          php artisan serve > /dev/null 2>&1 &
+          # Inicia o servidor em background
+          php artisan serve --env=testing > /dev/null 2>&1 &
+          
+          # Aguarda o servidor subir antes de rodar o dusk
+          sleep 5
+          
           chmod -R 0755 vendor/laravel/dusk/bin/
-          # Garante que o Chrome Driver é compatível
           php artisan dusk:chrome-driver --detect
           php artisan dusk
