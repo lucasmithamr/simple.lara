@@ -1,31 +1,44 @@
 name: CI-CD-Simple-Lara
 
-on: [push, pull_request]
+on: 
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
-  tests:
+  laravel-tests:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          # Atualizado para 8.4 para suportar os pacotes Symfony 8.0 do seu lock
-          php-version: '8.4' 
+          php-version: '8.4'
           extensions: mbstring, dom, curl, libxml, mysql, sqlite3
           coverage: none
 
-      - name: Install Dependencies
-        # Adicionei --ignore-platform-reqs como uma camada extra de segurança se necessário
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install PHP Dependencies
         run: composer install --no-ansi --no-interaction --no-scripts
+
+      - name: Install NPM Dependencies & Build Assets
+        run: |
+          npm install
+          npm run build
 
       - name: Prepare Environment
         run: |
           cp .env.example .env
           php artisan key:generate
-          # Cria um banco sqlite vazio para os testes não falharem por falta de arquivo
+          # Cria o arquivo de banco para os testes de Feature e Browser
           touch database/database.sqlite
 
       - name: Run Unit & Feature Tests
@@ -34,17 +47,22 @@ jobs:
           DB_DATABASE: database/database.sqlite
         run: php artisan test
 
-      - name: Run Dusk Tests
+      - name: Run Browser Tests (Dusk)
         env:
           DB_CONNECTION: sqlite
           DB_DATABASE: database/database.sqlite
+          APP_URL: http://127.0.0.1:8000
         run: |
-          # Inicia o servidor em background
-          php artisan serve --env=testing > /dev/null 2>&1 &
+          # 1. Rodar migrações para que o banco tenha as tabelas de login
+          php artisan migrate --force
           
-          # Aguarda o servidor subir antes de rodar o dusk
+          # 2. Iniciar o servidor em background
+          php artisan serve > /dev/null 2>&1 &
+          
+          # 3. Aguardar o servidor ficar online
           sleep 5
           
+          # 4. Configurar o Chrome Driver e rodar os testes
           chmod -R 0755 vendor/laravel/dusk/bin/
           php artisan dusk:chrome-driver --detect
           php artisan dusk
