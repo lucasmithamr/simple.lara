@@ -1,0 +1,36 @@
+name: CI-CD-Simple-Lara
+
+on: [push, pull_request]
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, dom, curl, libxml, mysql
+
+      - name: Install Dependencies
+        run: composer install --no-ansi --no-interaction --no-scripts
+
+      - name: Prepare Environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Run Unit & Feature Tests
+        run: php artisan test
+
+      - name: Run Dusk Tests
+        run: |
+          # O Dusk precisa do servidor rodando para "visitar" a URL
+          php artisan serve > /dev/null 2>&1 &
+          chmod -R 0755 vendor/laravel/dusk/bin/
+          # Garante que o Chrome Driver é compatível
+          php artisan dusk:chrome-driver --detect
+          php artisan dusk
