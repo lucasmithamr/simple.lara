@@ -1,2 +1,2 @@
 # Sobre o projeto
-Projeto laravel para estudo de CI/CD utilizando Gitflow..
+Projeto laravel para estudo de CI/CD utilizando Github actions..
